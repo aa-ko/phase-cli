@@ -6,7 +6,7 @@ from phase_cli.utils.secret_referencing import resolve_all_secrets
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn
 
-def phase_run_inject(command, env_name=None, phase_app=None, phase_app_id=None, tags=None, path: str = '/'):
+def phase_run_inject(command, env_name=None, phase_app=None, phase_app_id=None, tags=None, path: str = '/', nested: bool = False):
     """
     Executes a shell command with environment variables set to the secrets 
     fetched from Phase for the specified environment, resolving references as needed.
@@ -18,6 +18,7 @@ def phase_run_inject(command, env_name=None, phase_app=None, phase_app_id=None, 
         phase_app_id (str, optional): The ID of the Phase application. Defaults to None.
         tags (str, optional): Comma-separated list of tags to filter secrets. Defaults to None.
         path (str, optional): Specific path under which to fetch secrets. Defaults to '/'.
+        nested (bool, optional): Generate a nested structure, if the selected output format supports this. Defaults to False.
     """
     phase = Phase()
     console = Console()

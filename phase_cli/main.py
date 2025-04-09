@@ -71,6 +71,7 @@ class HelpfulParser(argparse.ArgumentParser):
 def main ():
     env_help = "Environment name eg. dev, staging, production"
     tag_help = '🏷️: Comma-separated list of tags to filter the secrets. Tags are case-insensitive and support partial matching. For example, using --tags "prod,config" will include secrets tagged with "Production" or "ConfigData". Underscores in tags are treated as spaces, so "prod_data" matches "prod data".'
+    nested_help = 'Generate a nested structure, if the selected output format supports this. Defaults to False.'
     app_help = 'The name of your Phase application. Optional: If you don\'t have a .phase.json file in your project directory or simply want to override it.'
     app_id_help = 'The ID of your Phase application. Takes precedence over --app if both are provided.'
     console = Console()
@@ -136,7 +137,8 @@ def main ():
         secrets_get_parser.add_argument('--app-id', type=str, help=app_id_help)
         secrets_get_parser.add_argument('--tags', type=str, help=tag_help)
         secrets_get_parser.add_argument('--path', type=str, default='/', required=False, help="The path from which to fetch the secret from. Default is '/'. Pass an empty string \"\" to fetch secrets from all paths.")
-
+        secrets_get_parser.add_argument('--nested', required=False, help="Generate a nested structure, if the selected output format supports this. Defaults to False.")
+        
         # Secrets create command
         secrets_create_parser = secrets_subparsers.add_parser(
             'create', 
@@ -252,6 +254,7 @@ def main ():
             choices=['dotenv', 'json', 'csv', 'yaml', 'xml', 'toml', 'hcl', 'ini', 'java_properties', 'kv'], 
             help='Specifies the export format. Supported formats: dotenv (default), kv, json, csv, yaml, xml, toml, hcl, ini, java_properties.')
         secrets_export_parser.add_argument('--tags', type=str, help=tag_help)
+        secrets_export_parser.add_argument('--nested', required=False, help=nested_help, action='store_true')
 
         # Users command
         users_parser = subparsers.add_parser('users', help='👥 Manage users and accounts')
@@ -324,7 +327,7 @@ def main ():
             elif args.secrets_command == 'import':
                 phase_secrets_env_import(args.env_file, env_name=args.env, path=args.path, phase_app=args.app, phase_app_id=args.app_id)
             elif args.secrets_command == 'export':
-                phase_secrets_env_export(env_name=args.env, keys=args.keys, phase_app=args.app, phase_app_id=args.app_id, path=args.path, tags=args.tags, format=args.format)
+                phase_secrets_env_export(env_name=args.env, keys=args.keys, phase_app=args.app, phase_app_id=args.app_id, path=args.path, tags=args.tags, format=args.format, nested=args.nested)
             elif args.secrets_command == 'update':
                 phase_secrets_update(args.key, env_name=args.env, phase_app=args.app, phase_app_id=args.app_id, source_path=args.path, destination_path=args.updated_path, random_type=args.random, random_length=args.length, override=args.override, toggle_override=args.toggle_override)
             else:

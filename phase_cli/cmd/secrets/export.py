@@ -9,7 +9,7 @@ from phase_cli.utils.secret_referencing import resolve_all_secrets
 from rich.console import Console
 
 
-def phase_secrets_env_export(env_name=None, phase_app=None, phase_app_id=None, keys=None, tags=None, format='dotenv', path: str = ''):
+def phase_secrets_env_export(env_name=None, phase_app=None, phase_app_id=None, keys=None, tags=None, format='dotenv', path: str = '', nested: bool = False):
     """
     Exports secrets from the specified environment with support for multiple export formats. 
     This function fetches secrets from Phase, resolves any cross-environment or local secret references, and then outputs them in the chosen format.
@@ -38,6 +38,10 @@ def phase_secrets_env_export(env_name=None, phase_app=None, phase_app_id=None, k
         format (str, optional): The format for exporting the secrets. Supported formats include 
                                 'dotenv', 'json', 'csv', 'yaml', 'xml', 'toml', 'hcl', 'ini', 
                                 'java_properties', and 'kv'. Defaults to 'dotenv'.
+        path (str, optional): The path under which to fetch secrets. If None, all paths will be
+                              fetched, starting at '/'. Defaults to None.
+        nested (bool, optional): Generate a nested structure, if the selected output format
+                                 supports this. Defaults to False.
 
     Raises:
         ValueError: If any errors occur during the fetching of secrets or if the specified format 
@@ -52,6 +56,17 @@ def phase_secrets_env_export(env_name=None, phase_app=None, phase_app_id=None, k
     try:
         # Fetch all secrets
         all_secrets = phase.get(env_name=env_name, app_name=phase_app, app_id=phase_app_id, tag=tags, path=path)
+
+        # Build tree if nested is True
+        tree = {}
+        if nested:
+            # We want to preserve the path structure when exporting, so we build a second dict containing a tree.
+            tree = build_tree_from_secret_paths(
+                all_secrets,
+                phase=phase,
+                current_app=phase_app,
+                current_env=env_name
+            )
 
         # Organize all secrets into a dictionary for easier lookup.
         secrets_dict = {}
@@ -97,7 +112,7 @@ def phase_secrets_env_export(env_name=None, phase_app=None, phase_app_id=None, k
 
         # Export based on the specified format
         if format == 'json':
-            export_json(filtered_secrets_dict)
+            export_json(filtered_secrets_dict, tree if nested else None)
         elif format == 'csv':
             export_csv(filtered_secrets_dict)
         elif format == 'yaml':
@@ -121,10 +136,50 @@ def phase_secrets_env_export(env_name=None, phase_app=None, phase_app_id=None, k
         console.log(f"Error: {e}")
         sys.exit(1)
 
+def build_tree_from_secret_paths(secrets, phase=None, current_app=None, current_env=None):
+    tree = {}
+    for secret in secrets:
+        path = secret.get('path')
+        current_node = tree
+        if path == '/':
+            try:
+                resolved_value = resolve_all_secrets(
+                    value=secret["value"],
+                    all_secrets=secrets,
+                    phase=phase,
+                    current_application_name=current_app,
+                    current_env_name=current_env
+                )
+                current_node[secret["key"]] = resolved_value
+            except ValueError as e:
+                # If resolution fails, use the original value
+                current_node[secret["key"]] = secret["value"]
+            continue
 
-def export_json(secrets_dict):
+        path_parts = path.strip('/').split('/')
+        for part in path_parts:
+            if part not in current_node:
+                current_node[part] = {}
+            current_node = current_node[part]
+        
+        try:
+            resolved_value = resolve_all_secrets(
+                value=secret["value"],
+                all_secrets=secrets,
+                phase=phase,
+                current_application_name=current_app,
+                current_env_name=current_env
+            )
+            current_node[secret["key"]] = resolved_value
+        except ValueError as e:
+            # If resolution fails, use the original value
+            current_node[secret["key"]] = secret["value"]
+    return tree
+
+
+def export_json(secrets_dict, secrets_tree):
     """Export secrets as JSON."""
-    print(json.dumps(secrets_dict, indent=4))
+    print(json.dumps(secrets_tree if secrets_tree is not None else secrets_dict, indent=4))
 
 
 def export_csv(secrets_dict):
